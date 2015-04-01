@@ -128,7 +128,7 @@ if (my $run = $sth_fetch->fetchrow_hashref)
 
     # call ogr2ogr to make shape files in temporary directory
     mkdir "/tmp/$rid-shp";
-    mysystem("ogr2ogr -overwrite -f 'ESRI Shapefile' /tmp/$rid-shp $OUTPUT_PATH/$rid/$name.sqlite -lco ENCODING=UTF-8");
+    mysystem("ogr2ogr -overwrite -f 'ESRI Shapefile' --config SHAPE_ENCODING UTF-8 /tmp/$rid-shp $OUTPUT_PATH/$rid/$name.sqlite");
 
     # load ogr2ogr output to find out field name truncations
     my $crosswalk = {};
@@ -163,7 +163,7 @@ if (my $run = $sth_fetch->fetchrow_hashref)
     foreach my $prj(glob("/tmp/$rid-shp/*.prj"))
     {
         open(PRJ, ">$prj");
-        print PRJ 'PROJCS["WGS 84 / Pseudo-Mercator",GEOGCS["Popular Visualisation CRS",DATUM["Popular_Visualisation_Datum",SPHEROID["Popular Visualisation Sphere",6378137,0,AUTHORITY["EPSG","7059"]],TOWGS84[0,0,0,0,0,0,0],AUTHORITY["EPSG","6055"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.01745329251994328,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4055"]],UNIT["metre",1,AUTHORITY["EPSG","9001"]],PROJECTION["Mercator_1SP"],PARAMETER["central_meridian",0],PARAMETER["scale_factor",1],PARAMETER["false_easting",0],PARAMETER["false_northing",0],AUTHORITY["EPSG","3785"],AXIS["X",EAST],AXIS["Y",NORTH]]';
+        print PRJ 'PROJCS["WGS_84_Pseudo_Mercator",GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Mercator"],PARAMETER["central_meridian",0],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["Meter",1],PARAMETER["standard_parallel_1",0.0]]';
         close(PRJ);
         $prj =~ /(.*)\.prj$/;
         my $cpg = $1.'.cpg';
@@ -177,19 +177,7 @@ if (my $run = $sth_fetch->fetchrow_hashref)
     addfile($rid, "$name.shp.zip", "ESRI Shapefile (zipped)");
     mysystem("rm -rf /tmp/$rid-shp");
 
-    # make KMZ file
-    mkdir ("$OUTPUT_PATH/tmp/$rid-kml");
-    mysystem("ogr2ogr -f 'KML' $OUTPUT_PATH/tmp/$rid-kml/doc.kml $OUTPUT_PATH/$rid/$name.sqlite");
-    mysystem("zip -j $OUTPUT_PATH/$rid/$name.kmz $OUTPUT_PATH/tmp/$rid-kml/*");
-    mysystem("rm -rf $OUTPUT_PATH/tmp/$rid-kml");
-    addfile($rid, "$name.kmz", "Google Earth (KMZ) file");
-
     # ADD FURTHER ogr2ogr CALLS HERE!
-    mkdir ("$OUTPUT_PATH//tmp/$rid-gmapsupp");
-    mysystem("java -Xmx3096m -jar /home/hot/mkgmap/mkgmap.jar --route --index -n 80000111 --description='$name' --gmapsupp --draw-priority=99 --family-id=3456 --nsis --series-name='$name' --output-dir=$OUTPUT_PATH/tmp/$rid-gmapsupp $OUTPUT_PATH/$rid/rawdata.osm.pbf");
-    mysystem("gzip < $OUTPUT_PATH/tmp/$rid-gmapsupp/gmapsupp.img > $OUTPUT_PATH/$rid/gmapsupp.img.gz", 1);
-    mysystem("rm -rf $OUTPUT_PATH//tmp/$rid-gmapsupp");
-    addfile($rid, "gmapsupp.img.gz", "Garmin map (EXPERIMENTAL; compressed)");
 
     # finally record log file
     addfile($rid, "log.txt", "job log file (log.txt)");
@@ -212,18 +200,8 @@ sub mymsg
 sub mysystem 
 {
     my $call = shift;
-    my $nolog = shift;
-
     mymsg("$call\n");
-    if (defined($nolog) && $nolog) 
-    {
-        system ("$call 2>>$logfile");
-    }
-    else
-    {
-        system ("$call >> $logfile 2>&1");
-    }
-
+    system ("$call >> $logfile 2>&1");
     if ($? == -1) {
         mymsg("failed to execute: $!");
         return 0;
